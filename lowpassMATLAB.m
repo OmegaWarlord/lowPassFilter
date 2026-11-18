@@ -1,4 +1,4 @@
-[y1, fs] = audioread('/untitled2.wav');
+[y1, fs] = audioread('/untitled.wav');
 y2 = filter(filter2filt,y1);
 
 audiowrite('filtered.wav', y2, fs);
