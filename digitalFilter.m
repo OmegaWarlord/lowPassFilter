@@ -1,7 +1,7 @@
 clear; close all; clc;
 
 % read the audio
-inputFileName = 'untitled3.wav';
+inputFileName = 'untitled.wav';
 noisyAudioFileName = 'noisy_audio.wav';
 outputFileName = 'filtered_audio.wav';
 [audioIn, fs] = audioread(inputFileName);
@@ -17,12 +17,15 @@ audiowrite(noisyAudioFileName, audioInNoisy, fs);
 
 % project specifications
 fp = 22000; 
+fs_stop = 23500;
 rp = 1;
 rs = 17;
 order = 20;
 
+
 % normalized passband for ellip
 Wp = fp / (fs / 2);
+Ws = fs_stop / (fs / 2);
 
 [z, p, k] = ellip(order, rp, rs, Wp, 'low');
 [sos, g] = zp2sos(z,p,k);
