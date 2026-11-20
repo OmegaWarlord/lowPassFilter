@@ -1,5 +1,7 @@
 clear; close all; clc;
 
+%garrett was here
+
 % read the audio
 inputFileName = 'input_audio.wav';
 noisyAudioFileName = 'noisy_audio.wav';
