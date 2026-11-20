@@ -1,7 +1,7 @@
 clear; close all; clc;
 
 % read the audio
-inputFileName = 'untitled.wav';
+inputFileName = 'input_audio.wav';
 noisyAudioFileName = 'noisy_audio.wav';
 outputFileName = 'filtered_audio.wav';
 [audioIn, fs] = audioread(inputFileName);
