@@ -9,32 +9,32 @@ rp = 1;
 rs = 17;
 
 %analog elliptic prototype
-Wp = 2*pi*fp/fs;                                        %normalize fp
-[z, p, k] = ellip(20, rp, rs, Wp, 'low', 's');          %generate an array of the poles and zeroes
+Wp = 2*pi*fp/fs;                                                            %normalize fp
+[zeroes, poles, gain] = ellip(20, rp, rs, Wp, 'low', 's');                  %generate an array of the poles and zeroes
 
-%compute from zeros & poles
-np = numel(p);                                          %size of array of poles
-r = zeros(np, 1);                                       %what
-for i = 1:np                                            %for loop over np
-    others = p([1:i-1, i+1:np]);                        %what
-    %display(others);
-    r(i) = k*prod(p(i)-z)/prod(p(i)-others);            %what
+%Transfer function
+%H(s) = K · prod(s − z_j) / prod(s − p_k)
+np = numel(poles);                                                          %size of array of poles
+residue = zeros(np);                                                        %creates an array of scalar 0s of size np
+for i = 1:np                                                                %for loop over np
+    p = poles(i)-poles([1:i-1, i+1:np]);                                    %calculate the difference pole at i and other poles
+    residue(i) = gain*prod(poles(i)-zeroes)/prod(p);                        %calculate the residue of the partial fraction expansion
 end
 
 
-used = false(np, 1); %what
-B = []; A = [];                                         %crate empty matrices for B and A
-for i = 1:np                                            %for loop over np
-    if used(i), continue; end                           %what
-    if abs(imag(p(i))) < 1e-12 * max(1, abs(p(i)))      %check if pole is real
-        B = [B; real(r(i)) 0 0];                        %what
-        A = [A; 1 -exp(real(p(i))) 0];                  %WHAT
-        used(i) = true;                                 %what
+used = false(np);                                                           %creates an array of logical 0s of size np to check if pole has been visited?
+B = []; A = [];                                                             %crate empty matrices for B and A
+for i = 1:np                                                                %for loop over np
+    if used(i), continue; end                                               %what
+    if abs(imag(poles(i))) < 1e-12 * max(1, abs(poles(i)))                  %check if pole is real
+        B = [B; real(residue(i)) 0 0];                                            %what
+        A = [A; 1 -exp(real(poles(i))) 0];                                      %WHAT
+        used(i) = true;                                                     %what
     else
-        j = find(~used & abs(p - conj(p(i))) < 1e-9*abs(p(i)), 1);
+        j = find(~used & abs(poles - conj(poles(i))) < 1e-9*abs(poles(i)), 1);
         used([i j]) = true;
-        ez = exp(p(i));
-        B = [B; 2*real(r(i)), -2*real(r(i)*conj(ez)), 0];
+        ez = exp(poles(i));
+        B = [B; 2*real(residue(i)), -2*real(residue(i)*conj(ez)), 0];
         A = [A; 1, -2*real(ez), abs(ez)^2];
     end
 end
@@ -42,7 +42,7 @@ end
 nsec = size(B,1);
 
 %parallel sum of biquads + feedthrough
-audioOut = k * audioIn;
+audioOut = gain * audioIn;
 for s = 1:nsec
     audioOut = audioOut + filter(B(s, :), A(s, :), audioIn,  [], 1);
 end
@@ -90,7 +90,7 @@ hold on; yline(fp/1000, '--r', 'LineWidth', 1.2); hold off;
 %% Frequency response of the designed digital filter
 nf = 8192;
 w  = linspace(0, pi, nf);
-H  = k * ones(1, nf);
+H  = gain * ones(1, nf);
 for s = 1:nsec
     H = H + freqz(B(s,:), A(s,:), w);
 end
