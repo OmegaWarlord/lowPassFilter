@@ -14,40 +14,36 @@ Wp = 2*pi*fp/fs;                                                            %nor
 
 %Transfer function
 %H(s) = K · prod(s − z_j) / prod(s − p_k)
-
-%{
 np = numel(poles);                                                          %size of array of poles
-r = zeros(np);                                                              %creates an array of scalar 0s of size np
+residue = zeros(np);                                                        %creates an array of scalar 0s of size np
 for i = 1:np                                                                %for loop over np
     p = poles(i)-poles([1:i-1, i+1:np]);                                    %calculate the difference pole at i and other poles
-    r(i) = gain*prod(poles(i)-zeroes)/prod(p);                              %calculate the residue of the partial fraction expansion
+    residue(i) = gain*prod(poles(i)-zeroes)/prod(p);                        %calculate the residue of the partial fraction expansion
 end
 
 
-
 used = false(np);                                                           %creates an array of logical 0s of size np to check if pole has been visited?
-B = []; A = [];                                                             %crate empty matrices for B and A
+B = []; A = [];                                                             %crate empty matrices for coeficcients B and A
 for i = 1:np                                                                %for loop over np
-    if used(i), continue; end                                               %what
+    if used(i), continue; end                                               %check if pole was already checked
     if abs(imag(poles(i))) < 1e-12 * max(1, abs(poles(i)))                  %check if pole is real
-        B = [B; real(r(i)) 0 0];                                            %what
-        A = [A; 1 -exp(real(p(i))) 0];                                      %WHAT
-        used(i) = true;                                                     %what
+        B = [B; real(residue(i))];                                          %add coefficient to B array
+        A = [A; 1-exp(real(poles(i)))];                                     %add coefficient to A array
+        used(i) = true;                                                     %Check pole to used
     else
-        j = find(~used & abs(poles - conj(poles(i))) < 1e-9*abs(poles(i)), 1);
-        used([i j]) = true;
-        ez = exp(poles(i));
-        B = [B; 2*real(r(i)), -2*real(r(i)*conj(ez)), 0];
+        j = find(~used & abs(poles-conj(poles(i)))<1e-9*abs(poles(i)), 1);  %finds the location of the complex conjugate of the pole
+        used([i j]) = true;                                                 %sets used to that to true
+        ez = exp(poles(i));                                                 %exponential of pole i         
+        B = [B; 2*real(residue(i)), -2*real(residue(i)*conj(ez)), 0];       %
         A = [A; 1, -2*real(ez), abs(ez)^2];
     end
 end
 
-nsec = size(B,1);
 
 %parallel sum of biquads + feedthrough
 audioOut = gain * audioIn;
-for s = 1:nsec
-    audioOut = audioOut + filter(B(s, :), A(s, :), audioIn,  [], 1);
+for s = 1:size(B,1)
+    audioOut = audioOut + filter(B(s, :), A(s, :), audioIn);        %add filtered value from B & A to audio out
 end
 
 
@@ -94,7 +90,7 @@ hold on; yline(fp/1000, '--r', 'LineWidth', 1.2); hold off;
 nf = 8192;
 w  = linspace(0, pi, nf);
 H  = gain * ones(1, nf);
-for s = 1:nsec
+for s = 1:size(B,1)
     H = H + freqz(B(s,:), A(s,:), w);
 end
 figure('Color','white');
