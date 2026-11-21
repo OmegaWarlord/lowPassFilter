@@ -4,18 +4,14 @@ clear; close all; clc;
 
 % read the audio
 inputFileName = 'input_audio.wav';
-noisyAudioFileName = 'noisy_audio.wav';
 outputFileName = 'filtered_audio.wav';
 [audioIn, fs] = audioread(inputFileName);
-
-noiseLevel = 0.1;  % adjust as needed
-hfNoise = randn(size(audioIn));
 
 % project specifications
 fp = 22000; 
 rp = 1;
 rs = 17;
-order = 20;
+order = 4;
 
 
 % normalized passband for ellip
@@ -23,11 +19,11 @@ order = 20;
 
 Wp = 2 * pi * fp;
 
-[z, p, k] = ellip(4, rp, rs, Wp, 'low', 's');
+[z, p, k] = ellip(order, rp, rs, Wp, 'low', 's');
 
 [b, a] = zp2tf(z, p, k);
 
-[bz,az] = impinvar(b,a,fs);
+[bz,az] = impinvar(b,a,fs, 1e-4);
 
 [sos, g] = tf2sos(bz, az);
 
