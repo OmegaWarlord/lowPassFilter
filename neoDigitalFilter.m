@@ -1,7 +1,7 @@
 clear; close all; clc;
 
 %read audio data
-[audioIn, fs] = audioread('input_audio.wav');
+[audioIn, fs] = audioread('untitled.wav');
 
 %filter specs
 fp = 22000;
@@ -23,20 +23,19 @@ end
 
 
 used = false(np);                                                           %creates an array of logical 0s of size np to check if pole has been visited?
-B = []; A = [];                                                             %crate empty matrices for coeficcients B and A
+B = []; A = [];                                                             %crate empty matrices for coefficients B and A
 for i = 1:np                                                                %for loop over np
     if used(i), continue; end                                               %check if pole was already checked
-    if abs(imag(poles(i))) < 1e-12 * max(1, abs(poles(i)))                  %check if pole is real
+    if abs(imag(poles(i))) < 1e-12 * max(abs(poles(i)))                     %check if pole is real
         B = [B; real(residue(i))];                                          %add coefficient to B array
-        A = [A; 1-exp(real(poles(i)))];                                     %add coefficient to A array
-        used(i) = true;                                                     %Check pole to used
+        A = [A; 1-exp(real(poles(i)))];                                     %add coefficient to A array                                                   %Check pole to used
     else
-        j = find(~used & abs(poles-conj(poles(i)))<1e-9*abs(poles(i)), 1);  %finds the location of the complex conjugate of the pole
-        used([i j]) = true;                                                 %sets used to that to true
         ez = exp(poles(i));                                                 %exponential of pole i         
         B = [B; 2*real(residue(i)), -2*real(residue(i)*conj(ez)), 0];       %coefficient of b
         A = [A; 1, -2*real(ez), abs(ez)^2];                                 %coefficient of a
     end
+    j = find(~used & abs(poles-conj(poles(i)))<1e-9*abs(poles(i)), 1);      %finds the location of the complex conjugate of the pole
+    used([i j]) = true;                                                     %sets used to that to true
 end
 
 
@@ -64,28 +63,34 @@ subplot(3, 1, 1);
 plot(t, audioIn(:,1), 'Color', [0.7 0.7 0.7], 'LineWidth', 0.8); 
 hold on;
 plot(t, audioOut(:,1), 'Color', [0 0.4 0.8], 'LineWidth', 1.0); 
-grid on;
 title(sprintf('Time-Domain Waveforms (Noisy Input vs. Order 20 Elliptic, Impulse Invariance @ %g kHz)', fp/1000));
 xlabel('Time (s)'); 
 ylabel('Amplitude');
 legend('Noisy input', 'Filtered', 'Location', 'northeast');
 xlim([0, t(end)]);
 hold off;
+grid on;
 
 windowLen = 1024; overlapLen = 512; nfft = 2048;
 
 subplot(3, 1, 2);
 spectrogram(audioIn(:,1), windowLen, overlapLen, nfft, fs, 'yaxis');
 title('Noisy Audio Spectrogram');
-ylim([0, fs/2/1000]); ylabel('Freq (kHz)');
-colorbar; clim([-120, 0]);
+ylim([0, fs/2/1000]); 
+ylabel('Freq (kHz)');
+colorbar; 
+clim([-120, 0]);
 
 subplot(3, 1, 3);
 spectrogram(audioOut(:,1), windowLen, overlapLen, nfft, fs, 'yaxis');
 title(sprintf('Filtered Audio Spectrogram (Cutoff: %g kHz)', fp/1000));
-ylim([0, fs/2/1000]); ylabel('Freq (kHz)');
-colorbar; clim([-120, 0]);
-hold on; yline(fp/1000, '--r', 'LineWidth', 1.2); hold off;
+ylim([0, fs/2/1000]); 
+ylabel('Freq (kHz)');
+colorbar; 
+clim([-120, 0]);
+hold on; 
+yline(fp/1000, '--r', 'LineWidth', 1.2); 
+hold off;
 
 %% Frequency response of the designed digital filter
 nf = 8192;
@@ -95,10 +100,58 @@ for s = 1:size(B,1)
     H = H + freqz(B(s,:), A(s,:), w);
 end
 figure('Color','white');
-plot(w/pi*fs/2/1000, 20*log10(abs(H)+eps), 'LineWidth', 1.2); grid on;
+plot(w/pi*fs/2/1000, 20*log10(abs(H)+eps), 'LineWidth', 1.2); 
 xline(fp/1000, '--r');
 xlabel('Frequency (kHz)'); ylabel('Magnitude (dB)');
 title('Impulse-Invariant Elliptic Filter Response');
 ylim([-20 5]);
+grid on;
 
         
+%% DFT before / after filtering, with filter response overlaid (memory-safe)
+x = single(audioIn(:,1));
+y = single(audioOut(:,1));
+N = numel(x);
+
+X = abs(fftshift(fft(x)));                      % centered DFT magnitude
+Y = abs(fftshift(fft(y)));
+clear x y
+
+nrm = max(X);                                   % same normalization for both
+X = X / nrm;
+Y = Y / nrm;
+
+% Decimate for plotting: keep the peak of each block so spikes are preserved
+nPlot = 4000;
+blk   = max(1, floor(N / nPlot));
+M     = floor(N / blk) * blk;
+off   = floor((N - M) / 2);                     % trim equally from both ends (keeps 0 Hz centered)
+Xd = max(reshape(X(off+1:off+M), blk, []), [], 1);
+Yd = max(reshape(Y(off+1:off+M), blk, []), [], 1);
+fAll = (-floor(N/2) : ceil(N/2)-1) * (fs / N);  % tiny vector math only on the trimmed range below
+fd   = mean(reshape(fAll(off+1:off+M), blk, []), 1);
+clear X Y fAll
+
+% Filter magnitude response on a fixed, small two-sided grid
+wg = linspace(-pi, pi, 8192);
+Hf = gain * ones(1, numel(wg));
+for s = 1:size(B,1)
+    Hf = Hf + freqz(B(s,:), A(s,:), wg).';
+end
+Hmag = abs(Hf);
+fH   = wg / pi * fs / 2;
+
+figure('Color','white', 'Position', [100 50 1100 700]);
+
+subplot(2,1,1);
+plot(fd, Xd, 'Color', [0.19 0.45 0.74]); hold on;
+plot(fH, Hmag, 'Color', [0.85 0.37 0.1], 'LineWidth', 1.2); hold off;
+title('DFT Before Filtering');
+xlim([-fs/2 fs/2]); ylim([0 1]);
+
+subplot(2,1,2);
+plot(fd, Yd, 'Color', [0.19 0.45 0.74]); hold on;
+plot(fH, Hmag, 'Color', [0.85 0.37 0.1], 'LineWidth', 1.2); hold off;
+title('DFT After Filtering');
+xlim([-fs/2 fs/2]); ylim([0 1]);
+xlabel('Frequency (Hz)');
