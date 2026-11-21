@@ -10,12 +10,6 @@ outputFileName = 'filtered_audio.wav';
 
 noiseLevel = 0.1;  % adjust as needed
 hfNoise = randn(size(audioIn));
-% uses a butter filter just to get the high frequency noise
-[bNoise, aNoise] = butter(4, 22000 / (fs / 2), 'high');
-hfNoise = filter(bNoise, aNoise, hfNoise);
-
-audioInNoisy = audioIn + noiseLevel * hfNoise;
-audiowrite(noisyAudioFileName, audioInNoisy, fs);
 
 % project specifications
 fp = 22000; 
@@ -25,27 +19,37 @@ order = 20;
 
 
 % normalized passband for ellip
-Wp = fp / (fs / 2);
+%Wp = fp / (fs / 2);
 
-[z, p, k] = ellip(order, rp, rs, Wp, 'low');
-[sos, g] = zp2sos(z,p,k);
+Wp = 2 * pi * fp;
 
-audioOut = g * sosfilt(sos, audioInNoisy);
+[z, p, k] = ellip(4, rp, rs, Wp, 'low', 's');
 
-peak = max(abs(audioOut), [], 'all');
-if peak > 0
-    audioOut = 0.95 * audioOut / peak;
+[b, a] = zp2tf(z, p, k);
+
+[bz,az] = impinvar(b,a,fs);
+
+[sos, g] = tf2sos(bz, az);
+
+audioOut = g * sosfilt(sos, audioIn, 1);
+
+display(audioOut);
+
+peakVal = max(abs(audioOut(:)));
+if peakVal > 1
+    audioOut = audioOut / peakVal;
 end
 
 audiowrite(outputFileName, audioOut, fs);
 fprintf('Filtered audio saved to: %s\n', outputFileName);
 
-t = (0:length(audioInNoisy)-1) / fs;
+
+t = (0:length(audioIn)-1) / fs;
 
 figure('Color', 'white', 'Position', [100, 50, 1100, 850]);
 
 subplot(3, 1, 1);
-plot(t, audioInNoisy, 'Color', [0.7 0.7 0.7], 'LineWidth', 0.8);
+plot(t, audioIn, 'Color', [0.7 0.7 0.7], 'LineWidth', 0.8);
 hold on;
 plot(t, audioOut, 'Color', [0 0.4 0.8], 'LineWidth', 1.0);
 grid on;
@@ -61,7 +65,7 @@ overlapLen = 512;
 nfft = 2048;
 
 subplot(3, 1, 2);
-spectrogram(audioInNoisy, windowLen, overlapLen, nfft, fs, 'yaxis');
+spectrogram(audioIn, windowLen, overlapLen, nfft, fs, 'yaxis');
 title('Noisy Audio Spectrogram');
 ylim([0, fs/2/1000]);
 ylabel('Freq (kHz)');

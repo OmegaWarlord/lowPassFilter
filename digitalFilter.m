@@ -10,12 +10,6 @@ outputFileName = 'filtered_audio.wav';
 
 noiseLevel = 0.1;  % adjust as needed
 hfNoise = randn(size(audioIn));
-% uses a butter filter just to get the high frequency noise
-%[bNoise, aNoise] = butter(4, 22000 / (fs / 2), 'high');
-%hfNoise = filter(bNoise, aNoise, hfNoise);
-
-%audioInNoisy = audioIn + noiseLevel * hfNoise;
-%audiowrite(noisyAudioFileName, audioInNoisy, fs);
 
 % project specifications
 fp = 22000; 
