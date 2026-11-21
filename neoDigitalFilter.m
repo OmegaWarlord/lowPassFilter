@@ -7,27 +7,26 @@ clear; close all; clc;
 fp = 22000;
 rp = 1;
 rs = 17;
-order = 20;
 
 %analog elliptic prototype
 Wp = 2*pi*fp/fs;                                        %normalize fp
-[z, p, k] = ellip(order, rp, rs, Wp, 'low', 's');       %what
+[z, p, k] = ellip(20, rp, rs, Wp, 'low', 's');          %generate an array of the poles and zeroes
 
 %compute from zeros & poles
-np = numel(p);                                          %what
+np = numel(p);                                          %size of array of poles
 r = zeros(np, 1);                                       %what
 for i = 1:np                                            %for loop over np
     others = p([1:i-1, i+1:np]);                        %what
+    %display(others);
     r(i) = k*prod(p(i)-z)/prod(p(i)-others);            %what
 end
 
-d = k; %?
 
 used = false(np, 1); %what
 B = []; A = [];                                         %crate empty matrices for B and A
 for i = 1:np                                            %for loop over np
     if used(i), continue; end                           %what
-    if abs(imag(p(i))) < 1e-12 * max(1, abs(p(i)))     %check if pole is real
+    if abs(imag(p(i))) < 1e-12 * max(1, abs(p(i)))      %check if pole is real
         B = [B; real(r(i)) 0 0];                        %what
         A = [A; 1 -exp(real(p(i))) 0];                  %WHAT
         used(i) = true;                                 %what
@@ -42,24 +41,16 @@ end
 
 nsec = size(B,1);
 
-%check stability
-fprintf('Order %d, %d parallel sections, max |pole| = %.6f\n', ...
-    order, nsec, max(abs(exp(p))));
-
 %parallel sum of biquads + feedthrough
-audio = k * audioIn;
+audioOut = k * audioIn;
 for s = 1:nsec
     audioOut = audioOut + filter(B(s, :), A(s, :), audioIn,  [], 1);
 end
 
-display(d);
-display(k);
 
 %check for audio cliping
 peakVal = max(abs(audioOut(:)));
-if peakVal > 1
-    audioOut = audioOut / peakVal;
-end
+if peakVal > 1, audioOut = audioOut / peakVal; end
 
 
 %write audio
@@ -75,7 +66,7 @@ plot(t, audioIn(:,1), 'Color', [0.7 0.7 0.7], 'LineWidth', 0.8);
 hold on;
 plot(t, audioOut(:,1), 'Color', [0 0.4 0.8], 'LineWidth', 1.0);
 grid on;
-title(sprintf('Time-Domain Waveforms (Noisy Input vs. Order-%d Elliptic, Impulse Invariance @ %g kHz)', order, fp/1000));
+title(sprintf('Time-Domain Waveforms (Noisy Input vs. Order 20 Elliptic, Impulse Invariance @ %g kHz)', fp/1000));
 xlabel('Time (s)'); ylabel('Amplitude');
 legend('Noisy input', 'Filtered', 'Location', 'northeast');
 xlim([0, t(end)]);
@@ -99,7 +90,7 @@ hold on; yline(fp/1000, '--r', 'LineWidth', 1.2); hold off;
 %% Frequency response of the designed digital filter
 nf = 8192;
 w  = linspace(0, pi, nf);
-H  = d * ones(1, nf);
+H  = k * ones(1, nf);
 for s = 1:nsec
     H = H + freqz(B(s,:), A(s,:), w);
 end
