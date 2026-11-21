@@ -1,0 +1,31 @@
+%read audio data
+[audioIn, fs] = audioread('input_audio.wav');
+
+%filter specs
+fp = 22000;
+rp = 1;
+rs = 17;
+order = 20;
+
+%analog elliptic prototype
+Wp = 2*pi*fp/fs;                                        %normalize fp
+[z, p, k] = ellip(order, rp, rs, Wp, 'low', 's');       %what
+
+%compute from zeros & poles
+np = numel(p);                                          %what
+r = zeros(np, 1);                                       %what
+for i = 1:np                                            %for loop over np
+    others = p([1:i-1, i+1:np]);                        %what
+    r(i) = k*prod(p(i)-z)/prod(p(i)-others);            %what
+end
+
+d = k; %?
+
+used = false(np, 1); %what
+B = []; A = [];                                         %crate empty matrices for B and A
+for i = 1:np                                            %for loop over np
+    if used(i), continue; end                           %what
+    if abs(image(p(i))) < 1e-12 * max(1, abs(p(i)))     %check if pole is real
+        B = [B; real(r(i)) 0 0];
+        A = [A; 1 -exp(real(p(i))) 0];
+        
